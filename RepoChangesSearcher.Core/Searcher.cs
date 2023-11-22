@@ -1,6 +1,7 @@
 ﻿using LibGit2Sharp;
 using Microsoft.Extensions.Configuration;
 using RepoChangesSearcher.Core.Models;
+using System.IO;
 
 namespace RepoChangesSearcher.Core
 {
@@ -10,6 +11,8 @@ namespace RepoChangesSearcher.Core
         private bool _disposed;
         private readonly IConfiguration _configuration;
         private List<string> _changedFiles = new List<string>();
+        private List<string> _direcotryPaths = new List<string>();
+        private List<ProcessedFilesModel> _allProcessedFiles = new List<ProcessedFilesModel>();
 
         public Searcher(IConfiguration configuration)
         {
@@ -20,23 +23,37 @@ namespace RepoChangesSearcher.Core
         {
             var configuration = GetConfiguration();
 
-            var repoPath = configuration.repoPath;
+            var projectsPath = configuration.projectsPath;
             var branchToSearch = configuration.branchToSearch;
             var dateFrom = DateTime.Parse(configuration.dateFrom);
             var dateTo = DateTime.Parse(configuration.dateTo);
             var commiterEmail = configuration.commiterEmail;
 
-            InitRepo(repoPath);
+            _direcotryPaths.AddRange(Directory.GetDirectories(projectsPath).Select(x => new DirectoryInfo(x).FullName));
 
-            var searchedBranch = _repo.Branches.Single(x => x.FriendlyName == branchToSearch);
-            var comits = searchedBranch.Commits
-                            .Where(x => 
-                               x.Committer.When.Date >= dateFrom && x.Committer.When.Date <= dateTo &&
-                               x.Committer.Email.Equals(commiterEmail))
-                            .ToList();
+            _direcotryPaths.ForEach(path =>
+            {
+                InitRepo(path);
 
-            SetChangedFiles(comits);
-            RemoveDuplicates();
+                if (_repo != null)
+                {
+                    if (_repo.Branches.Any(x => x.FriendlyName == branchToSearch))
+                    {
+                        var searchedBranch = _repo.Branches.Single(x => x.FriendlyName == branchToSearch);
+                        var comits = searchedBranch.Commits
+                                        .Where(x =>
+                                           x.Committer.When.Date >= dateFrom && x.Committer.When.Date <= dateTo &&
+                                           x.Committer.Email.Equals(commiterEmail))
+                                        .ToList();
+
+                        SetChangedFiles(comits);
+                        RemoveDuplicates();
+                        ProcessFiles(projectsPath, path);
+                        
+                        _repo = null;
+                    }
+                }
+            });
         }
         public void Dispose()
         {
@@ -45,6 +62,22 @@ namespace RepoChangesSearcher.Core
                 _disposed = true;
                 _repo.Dispose();
             }
+        }
+
+        private void ProcessFiles(string projectsPath, string repoPath)
+        {
+            var pathToCreateDirectory = Path.Combine(projectsPath, "ChangedFilesFromRepository");
+            bool exists = Directory.Exists(pathToCreateDirectory);
+
+            if (!exists) Directory.CreateDirectory(pathToCreateDirectory);
+
+            _changedFiles.ForEach(changedFile =>
+            {
+                string file = Directory.GetFiles(repoPath, "*.*", SearchOption.AllDirectories).FirstOrDefault(x => x.Contains(changedFile));
+                //Copy functionality
+
+                _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true});
+            });
         }
 
         private void RemoveDuplicates()
@@ -95,19 +128,19 @@ namespace RepoChangesSearcher.Core
             }
         }
 
-        private (string repoPath, string branchToSearch, string dateFrom, string dateTo, string commiterEmail) GetConfiguration ()
+        private (string projectsPath, string branchToSearch, string dateFrom, string dateTo, string commiterEmail) GetConfiguration ()
         {
             var section = _configuration.GetSection("SearcherInfo");
 
             if (section == null) throw new InvalidOperationException("section SearcherInfo dosen't exists");
 
-            var repoPath = section.GetSection("RepoPath").Value;
+            var projectsPath = section.GetSection("ProjectsPath").Value;
             var searchedBranch = section.GetSection("SearchedBranch").Value;
             var dateFrom = section.GetSection("dateFrom").Value;
             var dateTo = section.GetSection("dateTo").Value;
             var commiterEmail = section.GetSection("CommiterEmail").Value;
 
-            return (repoPath, searchedBranch, dateFrom, dateTo, commiterEmail);
+            return (projectsPath, searchedBranch, dateFrom, dateTo, commiterEmail);
         }
 
 

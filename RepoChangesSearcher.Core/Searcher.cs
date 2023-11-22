@@ -89,7 +89,10 @@ namespace RepoChangesSearcher.Core
 
         private void InitRepo(string repoPath)
         {
-            _repo = new Repository(repoPath);
+            if (Repository.IsValid(repoPath))
+            {
+                _repo = new Repository(repoPath);
+            }
         }
 
         private (string repoPath, string branchToSearch, string dateFrom, string dateTo, string commiterEmail) GetConfiguration ()

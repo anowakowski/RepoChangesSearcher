@@ -30,6 +30,7 @@ namespace RepoChangesSearcher.Core
             var commiterEmail = configuration.commiterEmail;
 
             _direcotryPaths.AddRange(Directory.GetDirectories(projectsPath).Select(x => new DirectoryInfo(x).FullName));
+            CreateDirectoryToMoveFiles(projectsPath);
 
             _direcotryPaths.ForEach(path =>
             {
@@ -66,11 +67,6 @@ namespace RepoChangesSearcher.Core
 
         private void ProcessFiles(string projectsPath, string repoPath)
         {
-            var pathToCreateDirectory = Path.Combine(projectsPath, "ChangedFilesFromRepository");
-            bool exists = Directory.Exists(pathToCreateDirectory);
-
-            if (!exists) Directory.CreateDirectory(pathToCreateDirectory);
-
             _changedFiles.ForEach(changedFile =>
             {
                 string file = Directory.GetFiles(repoPath, "*.*", SearchOption.AllDirectories).FirstOrDefault(x => x.Contains(changedFile));
@@ -78,6 +74,21 @@ namespace RepoChangesSearcher.Core
 
                 _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true});
             });
+        }
+
+        private string GetPathToCreateDirectory(string projectsPath) => Path.Combine(projectsPath, "ChangedFilesFromRepository");
+
+        private void CreateDirectoryToMoveFiles(string projectsPath)
+        {
+            try
+            {
+                bool exists = Directory.Exists(GetPathToCreateDirectory(projectsPath));
+                if (!exists) Directory.CreateDirectory(GetPathToCreateDirectory(projectsPath));
+            }
+            catch(Exception ex)
+            {
+
+            }
         }
 
         private void RemoveDuplicates()

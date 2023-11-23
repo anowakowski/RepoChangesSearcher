@@ -1,5 +1,6 @@
 ﻿using LibGit2Sharp;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using RepoChangesSearcher.Core.Models;
 using System.Diagnostics.Metrics;
 using System.IO;
@@ -11,13 +12,16 @@ namespace RepoChangesSearcher.Core
         private Repository _repo;
         private bool _disposed;
         private readonly IConfiguration _configuration;
+        private readonly ILogger _logger;
+
         private List<string> _changedFiles = new List<string>();
         private List<string> _direcotryPaths = new List<string>();
         private List<ProcessedFilesModel> _allProcessedFiles = new List<ProcessedFilesModel>();
 
-        public Searcher(IConfiguration configuration)
+        public Searcher(IConfiguration configuration, ILogger logger)
         {
             _configuration = configuration;
+            _logger = logger;
         }
 
         public void Search()
@@ -30,17 +34,23 @@ namespace RepoChangesSearcher.Core
             var dateTo = DateTime.Parse(configuration.dateTo);
             var authorEmail = configuration.authorEmail;
 
+            _logger.LogInformation($"Start Files for configuration: projectPath {projectsPath}, branchName: {branchToSearch}, author: {authorEmail}");
+
             _direcotryPaths.AddRange(Directory.GetDirectories(projectsPath).Select(x => new DirectoryInfo(x).FullName));
             CreateDirectoryToMoveFiles(projectsPath);
 
-            _direcotryPaths.Where(x => x.Contains("RAS")).ToList().ForEach(path =>
+            _logger.LogInformation($"Found: {_direcotryPaths.Count()} projects to search in {projectsPath}");
+
+            _direcotryPaths.ForEach(path =>
             {
                 InitRepo(path);
-
+                
                 if (_repo != null)
                 {
+                    _logger.LogInformation($"Configure project repo: {path}");
                     if (_repo.Branches.Any(x => x.FriendlyName == branchToSearch))
                     {
+                        _logger.LogInformation($"Search for project repo: {path} in progress...");
                         var searchedBranch = _repo.Branches.Single(x => x.FriendlyName == branchToSearch);
                         var comits = searchedBranch.Commits
                                         .Where(x =>
@@ -51,7 +61,15 @@ namespace RepoChangesSearcher.Core
                         SetChangesFiles(comits);
                         RemoveDuplicates();
                         ProcessFiles(projectsPath, path);
-                        
+
+                        _logger.LogInformation($"End process for project repo: {path}");
+                        _logger.LogInformation($"Copy {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)} files for project repo: {path}");
+
+                        if (_allProcessedFiles.Any(x => !x.SuccessfullyProcessed))
+                        {
+                            _logger.LogWarning($"Some file not proccessed for project repo:{path}, not processed files: {_allProcessedFiles.Count(x => !x.SuccessfullyProcessed)}");
+                        }
+
                         _repo = null;
                     }
                 }
@@ -77,9 +95,13 @@ namespace RepoChangesSearcher.Core
                     if (!string.IsNullOrEmpty(file))
                     {
                         var destFilePath = Path.Combine(GetOutputCatalogPath(projectsPath), changedFile);
-                        File.Copy(file, destFilePath);
 
-                        _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true });
+                        if (!File.Exists(destFilePath))
+                        {
+                            File.Copy(file, destFilePath);
+
+                            _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true });
+                        }
                     }
                     else
                     {
@@ -88,7 +110,8 @@ namespace RepoChangesSearcher.Core
                 }
                 catch(Exception ex)
                 {
-                    var message = ex.ToString(); 
+                    var message = ex.ToString();
+                    _logger.LogError(ex, message);
                 }
             });
         }

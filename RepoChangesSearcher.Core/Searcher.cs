@@ -67,13 +67,15 @@ namespace RepoChangesSearcher.Core
 
                         if (_allProcessedFiles.Any(x => !x.SuccessfullyProcessed))
                         {
-                            _logger.LogWarning($"Some file not proccessed for project repo:{path}, not processed files: {_allProcessedFiles.Count(x => !x.SuccessfullyProcessed)}");
+                            _logger.LogWarning($"Some file not proccessed for project repo:{path}, not processed files: {_allProcessedFiles.Where(x => x.RepoPath == path).Count(x => !x.SuccessfullyProcessed)}");
                         }
 
                         _repo = null;
                     }
                 }
             });
+
+            _logger.LogInformation($"Finished search and copy process, copy: {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)}, and {_allProcessedFiles.Count(x => !x.SuccessfullyProcessed)} not processed");
         }
         public void Dispose()
         {
@@ -100,12 +102,12 @@ namespace RepoChangesSearcher.Core
                         {
                             File.Copy(file, destFilePath);
 
-                            _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true });
+                            _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true, RepoPath = repoPath });
                         }
                     }
                     else
                     {
-                        _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = false });
+                        _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = false, RepoPath = repoPath });
                     }
                 }
                 catch(Exception ex)
@@ -127,7 +129,7 @@ namespace RepoChangesSearcher.Core
             }
             catch(Exception ex)
             {
-
+                _logger.LogError($"Can't create new directory for searched files, error message: {ex.Message}");
             }
         }
 
@@ -138,21 +140,27 @@ namespace RepoChangesSearcher.Core
 
         private void SetChangesFiles(List<Commit> commits)
         {
-            if (commits.Any()) 
+            try
             {
-                commits.ForEach(commit =>
+                if (commits.Any())
                 {
-                    var tree = commit.Tree;
-                    var treeParent = commit.Parents.FirstOrDefault().Tree;
-
-                    var patch = _repo.Diff.Compare<Patch>(treeParent, tree).ToList();
-
-                    if (patch != null)
+                    commits.ForEach(commit =>
                     {
-                        _changedFiles.AddRange(patch.Where(x => x.Status == ChangeKind.Modified).Select(x => Path.GetFileName(x.Path)));
-                    }
-                });
-            
+                        var tree = commit.Tree;
+                        var treeParent = commit.Parents.FirstOrDefault().Tree;
+
+                        var patch = _repo.Diff.Compare<Patch>(treeParent, tree).ToList();
+
+                        if (patch != null)
+                        {
+                            _changedFiles.AddRange(patch.Where(x => x.Status == ChangeKind.Modified).Select(x => Path.GetFileName(x.Path)));
+                        }
+                    });
+                }
+            }
+            catch(Exception ex)
+            {
+                _logger.LogError($"Error during searching changes files in commits, error message: {ex.Message}");
             }
         }
 

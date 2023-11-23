@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using RepoChangesSearcher.Core.Models;
 using Serilog;
+using System.Text;
 
 namespace RepoChangesSearcher.Core
 {
@@ -30,7 +31,7 @@ namespace RepoChangesSearcher.Core
             var dateTo = DateTime.Parse(configuration.dateTo);
             var authorEmail = configuration.authorEmail;
 
-            Log.Information($"Start Files for configuration: projectPath {projectsPath}, branchName: {branchToSearch}, author: {authorEmail}");
+            Log.Information($"Start search Files from repo for configuration: projectPath {projectsPath}, branchName: {branchToSearch}, author: {authorEmail}");
 
             _direcotryPaths.AddRange(Directory.GetDirectories(projectsPath).Select(x => new DirectoryInfo(x).FullName));
             CreateDirectoryToMoveFiles(projectsPath);
@@ -69,19 +70,36 @@ namespace RepoChangesSearcher.Core
                         ProcessFiles(projectsPath, path);
 
                         Log.Information($"End process for project repo: {path}");
-                        Log.Information($"Copy {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)} files for project repo: {path}");
+                        Log.Information($"Copy {_allProcessedFiles.Count(x => x.SuccessfullyProcessed && x.RepoPath == path)} files for project repo: {path}");
 
-                        if (_allProcessedFiles.Any(x => !x.SuccessfullyProcessed))
+                        if (_allProcessedFiles.Any(x => !x.SuccessfullyProcessed && x.RepoPath == path))
                         {
-                            Log.Warning($"Some file not proccessed for project repo:{path}, not processed files: {_allProcessedFiles.Where(x => x.RepoPath == path).Count(x => !x.SuccessfullyProcessed)}");
+                            Log.Warning($"Some file not proccessed for project repo:{path}, not processed files: {_allProcessedFiles.Where(x => x.RepoPath == path && !x.SuccessfullyProcessed).Count()}");
                         }
 
                         _repo = null;
+                        _changedFiles.Clear();
                     }
                 }
             });
             
             Log.Information($"Finished search and copy process, copy: {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)}, and {_allProcessedFiles.Count(x => !x.SuccessfullyProcessed)} not processed");
+
+            if (_allProcessedFiles.Any(x => !x.SuccessfullyProcessed))
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine();
+                sb.AppendLine("Not processed files: ");                
+                _allProcessedFiles
+                    .Where(x => !x.SuccessfullyProcessed)
+                    .ToList()
+                    .ForEach(file =>
+                    {
+                        sb.AppendLine($"not processed file => name: {file.FileName}, repoPath: {file.RepoPath}, message: {file.ErrorMessage}");
+                    });
+                
+                Log.Warning(sb.ToString());
+            }            
         }
         public void Dispose()
         {
@@ -110,10 +128,14 @@ namespace RepoChangesSearcher.Core
 
                             _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true, RepoPath = repoPath });
                         }
+                        else
+                        {
+                            _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = false, RepoPath = repoPath, ErrorMessage = $"File {changedFile} arledy exist in destination path" });
+                        }
                     }
                     else
                     {
-                        _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = false, RepoPath = repoPath });
+                        _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = false, RepoPath = repoPath, ErrorMessage = $"File {changedFile} not exist in repoPath: {repoPath}" });
                     }
                 }
                 catch(Exception ex)

@@ -33,6 +33,7 @@ var searcher = serviceProvider.GetService<ISearcher>();
 
 searcher.Search();
 
+Console.WriteLine("Click any key to close");
 Console.ReadKey();
 
 

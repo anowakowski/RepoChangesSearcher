@@ -80,7 +80,7 @@ namespace RepoChangesSearcher.Core
                     }
                 }
             });
-
+            
             Log.Information($"Finished search and copy process, copy: {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)}, and {_allProcessedFiles.Count(x => !x.SuccessfullyProcessed)} not processed");
         }
         public void Dispose()

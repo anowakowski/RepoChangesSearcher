@@ -14,9 +14,10 @@ var loggerConfiguration = new LoggerConfiguration()
                                             restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information,
                                             outputTemplate: "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}")
                                 .WriteTo.File(
-                                            "RepoChangesSearcherLog.txt", 
+                                            "RepoChangesSearcherLog_.txt", 
                                             restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information,
-                                            outputTemplate: "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}")
+                                            outputTemplate: "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}",
+                                            rollingInterval: RollingInterval.Hour)
                                 .CreateLogger();
 
 Log.Logger = loggerConfiguration;

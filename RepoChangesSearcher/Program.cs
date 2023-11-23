@@ -18,7 +18,6 @@ using var loggerFactory = LoggerFactory.Create(builder =>
         .AddFilter("NonHostConsoleApp.Program", LogLevel.Debug)
         .AddSimpleConsole(options =>
         {
-            //options.SingleLine = true;
             options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
         })
         .AddDebug()

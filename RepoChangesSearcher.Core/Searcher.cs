@@ -25,11 +25,13 @@ namespace RepoChangesSearcher.Core
         {
             var configuration = GetConfiguration();
 
+            if (!CheckConfigurationValues(configuration)) return;
+
             var projectsPath = configuration.projectsPath;
             var branchToSearch = configuration.branchToSearch;
             var dateFrom = DateTime.Parse(configuration.dateFrom);
             var dateTo = DateTime.Parse(configuration.dateTo);
-            var authorEmail = configuration.authorEmail;
+            var authorEmail = configuration.authorEmail;            
 
             Log.Information($"Start search Files from repo for configuration: projectPath {projectsPath}, branchName: {branchToSearch}, author: {authorEmail}");
 
@@ -108,6 +110,46 @@ namespace RepoChangesSearcher.Core
                 _disposed = true;
                 _repo.Dispose();
             }
+        }
+
+        private bool CheckConfigurationValues((string projectsPath, string branchToSearch, string dateFrom, string dateTo, string authorEmail) configuration)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Some errors appears with configuration, check appsetting.json file");
+            sb.AppendLine("Erros: ");
+            var result = true;
+            if (string.IsNullOrEmpty(configuration.projectsPath))
+            {
+                sb.AppendLine("configuration field projectsPath can't be empty");
+                result = false;
+            }
+            if (string.IsNullOrEmpty(configuration.branchToSearch))
+            {
+                sb.AppendLine("configuration field branchToSearch can't be empty");
+                result = false;
+            }
+            if (string.IsNullOrEmpty(configuration.dateFrom))
+            {
+                sb.AppendLine("configuration field dateFrom can't be empty");
+                result = false;
+            }
+            if (string.IsNullOrEmpty(configuration.dateTo))
+            {
+                sb.AppendLine("configuration field dateTo can't be empty");
+                result = false;
+            }
+            if (string.IsNullOrEmpty(configuration.authorEmail))
+            {
+                sb.AppendLine("configuration field authorEmail can't be empty");
+                result = false;
+            }
+
+            if (!result)
+            {
+                Log.Error(sb.ToString());
+            }
+
+            return result;
         }
 
         private void ProcessFiles(string projectsPath, string repoPath)

@@ -30,4 +30,4 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: RepoChangesSearcher_Artifact
-        path: /home/runner/work/RepoChangesSearcher/RepoChangesSearcher/RepoChangesSearcher/bin/Release/     
+        path: /home/runner/work/RepoChangesSearcher/RepoChangesSearcher/RepoChangesSearcher/bin/Release/net7.0/publish/   

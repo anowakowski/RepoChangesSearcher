@@ -12,7 +12,7 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v3
@@ -26,8 +26,4 @@ jobs:
       run: dotnet build --no-restore
     - name: Publish
       run: dotnet publish -c Release
-    - name: Upload Build Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: RepoChangesSearcher_Artifact
-        path: /home/runner/work/RepoChangesSearcher/RepoChangesSearcher/RepoChangesSearcher/bin/Release/net7.0/publish/   
+  

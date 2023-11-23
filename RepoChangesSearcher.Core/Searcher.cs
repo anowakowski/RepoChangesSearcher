@@ -1,6 +1,7 @@
 ﻿using LibGit2Sharp;
 using Microsoft.Extensions.Configuration;
 using RepoChangesSearcher.Core.Models;
+using System.Diagnostics.Metrics;
 using System.IO;
 
 namespace RepoChangesSearcher.Core
@@ -27,12 +28,12 @@ namespace RepoChangesSearcher.Core
             var branchToSearch = configuration.branchToSearch;
             var dateFrom = DateTime.Parse(configuration.dateFrom);
             var dateTo = DateTime.Parse(configuration.dateTo);
-            var commiterEmail = configuration.commiterEmail;
+            var authorEmail = configuration.authorEmail;
 
             _direcotryPaths.AddRange(Directory.GetDirectories(projectsPath).Select(x => new DirectoryInfo(x).FullName));
             CreateDirectoryToMoveFiles(projectsPath);
 
-            _direcotryPaths.ForEach(path =>
+            _direcotryPaths.Where(x => x.Contains("RAS")).ToList().ForEach(path =>
             {
                 InitRepo(path);
 
@@ -43,11 +44,11 @@ namespace RepoChangesSearcher.Core
                         var searchedBranch = _repo.Branches.Single(x => x.FriendlyName == branchToSearch);
                         var comits = searchedBranch.Commits
                                         .Where(x =>
-                                           x.Committer.When.Date >= dateFrom && x.Committer.When.Date <= dateTo &&
-                                           x.Committer.Email.Equals(commiterEmail))
+                                           x.Author.When.Date >= dateFrom && x.Author.When.Date <= dateTo &&
+                                           x.Author.Email.Equals(authorEmail))
                                         .ToList();
 
-                        SetChangedFiles(comits);
+                        SetChangesFiles(comits);
                         RemoveDuplicates();
                         ProcessFiles(projectsPath, path);
                         
@@ -69,21 +70,37 @@ namespace RepoChangesSearcher.Core
         {
             _changedFiles.ForEach(changedFile =>
             {
-                string file = Directory.GetFiles(repoPath, "*.*", SearchOption.AllDirectories).FirstOrDefault(x => x.Contains(changedFile));
-                //Copy functionality
+                try
+                {
+                    string file = Directory.GetFiles(repoPath, "*.*", SearchOption.AllDirectories).FirstOrDefault(x => x.Contains(changedFile));
 
-                _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true});
+                    if (!string.IsNullOrEmpty(file))
+                    {
+                        var destFilePath = Path.Combine(GetOutputCatalogPath(projectsPath), changedFile);
+                        File.Copy(file, destFilePath);
+
+                        _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = true });
+                    }
+                    else
+                    {
+                        _allProcessedFiles.Add(new ProcessedFilesModel { FileName = changedFile, ProjectPath = repoPath, SuccessfullyProcessed = false });
+                    }
+                }
+                catch(Exception ex)
+                {
+                    var message = ex.ToString(); 
+                }
             });
         }
 
-        private string GetPathToCreateDirectory(string projectsPath) => Path.Combine(projectsPath, "ChangedFilesFromRepository");
+        private string GetOutputCatalogPath(string projectsPath) => Path.Combine(projectsPath, "ChangedFilesFromRepository");
 
         private void CreateDirectoryToMoveFiles(string projectsPath)
         {
             try
             {
-                bool exists = Directory.Exists(GetPathToCreateDirectory(projectsPath));
-                if (!exists) Directory.CreateDirectory(GetPathToCreateDirectory(projectsPath));
+                bool exists = Directory.Exists(GetOutputCatalogPath(projectsPath));
+                if (!exists) Directory.CreateDirectory(GetOutputCatalogPath(projectsPath));
             }
             catch(Exception ex)
             {
@@ -96,7 +113,27 @@ namespace RepoChangesSearcher.Core
             _changedFiles = _changedFiles.Distinct().ToList();
         }
 
-        private void SetChangedFiles(List<Commit> comits)
+        private void SetChangesFiles(List<Commit> commits)
+        {
+            if (commits.Any()) 
+            {
+                commits.ForEach(commit =>
+                {
+                    var tree = commit.Tree;
+                    var treeParent = commit.Parents.FirstOrDefault().Tree;
+
+                    var patch = _repo.Diff.Compare<Patch>(treeParent, tree).ToList();
+
+                    if (patch != null)
+                    {
+                        _changedFiles.AddRange(patch.Where(x => x.Status == ChangeKind.Modified).Select(x => Path.GetFileName(x.Path)));
+                    }
+                });
+            
+            }
+        }
+
+        private void SetChangedFilesOld(List<Commit> comits)
         {
             if (comits.Any())
             {
@@ -139,7 +176,7 @@ namespace RepoChangesSearcher.Core
             }
         }
 
-        private (string projectsPath, string branchToSearch, string dateFrom, string dateTo, string commiterEmail) GetConfiguration ()
+        private (string projectsPath, string branchToSearch, string dateFrom, string dateTo, string authorEmail) GetConfiguration ()
         {
             var section = _configuration.GetSection("SearcherInfo");
 
@@ -149,9 +186,9 @@ namespace RepoChangesSearcher.Core
             var searchedBranch = section.GetSection("SearchedBranch").Value;
             var dateFrom = section.GetSection("dateFrom").Value;
             var dateTo = section.GetSection("dateTo").Value;
-            var commiterEmail = section.GetSection("CommiterEmail").Value;
+            var authorEmail = section.GetSection("AuthorEmail").Value;
 
-            return (projectsPath, searchedBranch, dateFrom, dateTo, commiterEmail);
+            return (projectsPath, searchedBranch, dateFrom, dateTo, authorEmail);
         }
 
 

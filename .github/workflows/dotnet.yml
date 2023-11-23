@@ -30,7 +30,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: RepoChangesSearcher_Artifact
-        path: D:\a\RepoChangesSearcher\RepoChangesSearcher\RepoChangesSearcher\bin\Release\net7.0\publish\ 
+        path: D:\a\RepoChangesSearcher\RepoChangesSearcher\release\
 
 
       

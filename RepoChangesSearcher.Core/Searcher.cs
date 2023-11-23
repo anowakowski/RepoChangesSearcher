@@ -1,9 +1,7 @@
 ﻿using LibGit2Sharp;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using RepoChangesSearcher.Core.Models;
-using System.Diagnostics.Metrics;
-using System.IO;
+using Serilog;
 
 namespace RepoChangesSearcher.Core
 {
@@ -12,16 +10,14 @@ namespace RepoChangesSearcher.Core
         private Repository _repo;
         private bool _disposed;
         private readonly IConfiguration _configuration;
-        private readonly ILogger _logger;
 
         private List<string> _changedFiles = new List<string>();
         private List<string> _direcotryPaths = new List<string>();
         private List<ProcessedFilesModel> _allProcessedFiles = new List<ProcessedFilesModel>();
 
-        public Searcher(IConfiguration configuration, ILogger logger)
+        public Searcher(IConfiguration configuration)
         {
             _configuration = configuration;
-            _logger = logger;
         }
 
         public void Search()
@@ -34,12 +30,12 @@ namespace RepoChangesSearcher.Core
             var dateTo = DateTime.Parse(configuration.dateTo);
             var authorEmail = configuration.authorEmail;
 
-            _logger.LogInformation($"Start Files for configuration: projectPath {projectsPath}, branchName: {branchToSearch}, author: {authorEmail}");
+            Log.Information($"Start Files for configuration: projectPath {projectsPath}, branchName: {branchToSearch}, author: {authorEmail}");
 
             _direcotryPaths.AddRange(Directory.GetDirectories(projectsPath).Select(x => new DirectoryInfo(x).FullName));
             CreateDirectoryToMoveFiles(projectsPath);
 
-            _logger.LogInformation($"Found: {_direcotryPaths.Count()} projects to search in {projectsPath}");
+            Log.Information($"Found: {_direcotryPaths.Count()} projects to search in {projectsPath}");
 
             var stopLoop = false;
             _direcotryPaths.ForEach(path =>
@@ -49,18 +45,18 @@ namespace RepoChangesSearcher.Core
                 
                 if (_repo != null)
                 {
-                    _logger.LogInformation($"Configure project repo: {path}");
+                    Log.Information($"Configure project repo: {path}");
                     if (_repo.Branches.Any(x => x.FriendlyName == branchToSearch))
                     {
                         var branch = _repo.Branches.FirstOrDefault(x => x.FriendlyName == branchToSearch);
                         if (!branch.IsCurrentRepositoryHead)
                         {
-                            _logger.LogError($"Your branch for project repo: {path} is not set as CurrentRepositoryHead branch: {branchToSearch}, you need to chenge this before start search process proccess");
+                            Log.Error($"Your branch for project repo: {path} is not set as CurrentRepositoryHead branch: {branchToSearch}, you need to chenge this before start search process proccess");
                             stopLoop = true;
                             return;
                         }
 
-                        _logger.LogInformation($"Search for project repo: {path} in progress...");
+                        Log.Information($"Search for project repo: {path} in progress...");
                         var searchedBranch = _repo.Branches.Single(x => x.FriendlyName == branchToSearch);
                         var comits = searchedBranch.Commits
                                         .Where(x =>
@@ -72,12 +68,12 @@ namespace RepoChangesSearcher.Core
                         RemoveDuplicates();
                         ProcessFiles(projectsPath, path);
 
-                        _logger.LogInformation($"End process for project repo: {path}");
-                        _logger.LogInformation($"Copy {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)} files for project repo: {path}");
+                        Log.Information($"End process for project repo: {path}");
+                        Log.Information($"Copy {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)} files for project repo: {path}");
 
                         if (_allProcessedFiles.Any(x => !x.SuccessfullyProcessed))
                         {
-                            _logger.LogWarning($"Some file not proccessed for project repo:{path}, not processed files: {_allProcessedFiles.Where(x => x.RepoPath == path).Count(x => !x.SuccessfullyProcessed)}");
+                            Log.Warning($"Some file not proccessed for project repo:{path}, not processed files: {_allProcessedFiles.Where(x => x.RepoPath == path).Count(x => !x.SuccessfullyProcessed)}");
                         }
 
                         _repo = null;
@@ -85,7 +81,7 @@ namespace RepoChangesSearcher.Core
                 }
             });
 
-            _logger.LogInformation($"Finished search and copy process, copy: {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)}, and {_allProcessedFiles.Count(x => !x.SuccessfullyProcessed)} not processed");
+            Log.Information($"Finished search and copy process, copy: {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)}, and {_allProcessedFiles.Count(x => !x.SuccessfullyProcessed)} not processed");
         }
         public void Dispose()
         {
@@ -123,7 +119,7 @@ namespace RepoChangesSearcher.Core
                 catch(Exception ex)
                 {
                     var message = ex.ToString();
-                    _logger.LogError(ex, message);
+                    Log.Error(ex, message);
                 }
             });
         }
@@ -139,7 +135,7 @@ namespace RepoChangesSearcher.Core
             }
             catch(Exception ex)
             {
-                _logger.LogError($"Can't create new directory for searched files, error message: {ex.Message}");
+                Log.Error($"Can't create new directory for searched files, error message: {ex.Message}");
             }
         }
 
@@ -170,7 +166,7 @@ namespace RepoChangesSearcher.Core
             }
             catch(Exception ex)
             {
-                _logger.LogError($"Error during searching changes files in commits, error message: {ex.Message}");
+                Log.Error($"Error during searching changes files in commits, error message: {ex.Message}");
             }
         }
 

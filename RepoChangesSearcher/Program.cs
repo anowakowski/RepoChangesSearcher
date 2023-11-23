@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using RepoChangesSearcher;
 using RepoChangesSearcher.Core;
+using Serilog;
 
 IConfigurationBuilder builder = new ConfigurationBuilder();
 builder
@@ -10,25 +9,22 @@ builder
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .Build();
 
-using var loggerFactory = LoggerFactory.Create(builder =>
-{
-    builder
-        .AddFilter("Microsoft", LogLevel.Warning)
-        .AddFilter("System", LogLevel.Warning)
-        .AddFilter("NonHostConsoleApp.Program", LogLevel.Debug)
-        .AddSimpleConsole(options =>
-        {
-            options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
-        })
-        .AddDebug()
-        .SetMinimumLevel(LogLevel.Debug);
-});
+var loggerConfiguration = new LoggerConfiguration()
+                                .WriteTo.Console(
+                                            restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information,
+                                            outputTemplate: "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}")
+                                .WriteTo.File(
+                                            "RepoChangesSearcherLog.txt", 
+                                            restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information,
+                                            outputTemplate: "{Timestamp:HH:mm:ss} [{Level}] {Message}{NewLine}{Exception}")
+                                .CreateLogger();
+
+Log.Logger = loggerConfiguration;
 
 var serviceProvider = new ServiceCollection()
-    .AddLogging()
+    .AddLogging(builder => builder.AddSerilog(dispose: true))
     .AddSingleton<ISearcher, Searcher>()
     .AddSingleton<IConfiguration>(builder.Build())
-    .AddSingleton<ILogger>(loggerFactory.CreateLogger<AppLoggin>())
     .BuildServiceProvider();
 
 

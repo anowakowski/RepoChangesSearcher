@@ -41,8 +41,10 @@ namespace RepoChangesSearcher.Core
 
             _logger.LogInformation($"Found: {_direcotryPaths.Count()} projects to search in {projectsPath}");
 
+            var stopLoop = false;
             _direcotryPaths.ForEach(path =>
             {
+                if (stopLoop) return;
                 InitRepo(path);
                 
                 if (_repo != null)
@@ -50,6 +52,14 @@ namespace RepoChangesSearcher.Core
                     _logger.LogInformation($"Configure project repo: {path}");
                     if (_repo.Branches.Any(x => x.FriendlyName == branchToSearch))
                     {
+                        var branch = _repo.Branches.FirstOrDefault(x => x.FriendlyName == branchToSearch);
+                        if (!branch.IsCurrentRepositoryHead)
+                        {
+                            _logger.LogError($"Your branch for project repo: {path} is not set as CurrentRepositoryHead branch: {branchToSearch}, you need to chenge this before start search process proccess");
+                            stopLoop = true;
+                            return;
+                        }
+
                         _logger.LogInformation($"Search for project repo: {path} in progress...");
                         var searchedBranch = _repo.Branches.Single(x => x.FriendlyName == branchToSearch);
                         var comits = searchedBranch.Commits

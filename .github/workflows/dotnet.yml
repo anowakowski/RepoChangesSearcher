@@ -25,4 +25,4 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Publish
-      run: dotnet publish RepoChangesSearcher/RepoChangesSearcher.csproj -c Release -o release — nologo      
+      run: dotnet publish RepoChangesSearcher/RepoChangesSearcher.csproj -c Release — nologo      

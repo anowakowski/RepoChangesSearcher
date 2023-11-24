@@ -10,11 +10,15 @@ namespace RepoChangesSearcher.Core
     {
         private Repository _repo;
         private bool _disposed;
+
         private readonly IConfiguration _configuration;
 
         private List<string> _changedFiles = new List<string>();
         private List<string> _direcotryPaths = new List<string>();
         private List<ProcessedFilesModel> _allProcessedFiles = new List<ProcessedFilesModel>();
+
+        private const string DefaultOutputCatalogueBaseName = "ChangedFilesFromRepository";
+        private string defaultOutputCatalogueName = string.Empty;
 
         public Searcher(IConfiguration configuration)
         {
@@ -25,7 +29,7 @@ namespace RepoChangesSearcher.Core
         {
             var configuration = GetConfiguration();
 
-            if (!CheckConfigurationValues(configuration)) return;
+            if (!CheckConfigurationValues(configuration) || !ValidateProjectPath(configuration.projectsPath)) return;
 
             var projectsPath = configuration.projectsPath;
             var branchToSearch = configuration.branchToSearch;
@@ -112,6 +116,17 @@ namespace RepoChangesSearcher.Core
             }
         }
 
+        private bool ValidateProjectPath(string projectPath)
+        {
+            if (Directory.Exists(projectPath))
+            {
+                return true;
+            }
+
+            Log.Error($"Yourt projectPath: {projectPath} configured on appsettings.json not exists");
+            return false;   
+        }
+
         private bool CheckConfigurationValues((string projectsPath, string branchToSearch, string dateFrom, string dateTo, string authorEmail) configuration)
         {
             var sb = new StringBuilder();
@@ -162,7 +177,7 @@ namespace RepoChangesSearcher.Core
 
                     if (!string.IsNullOrEmpty(file))
                     {
-                        var destFilePath = Path.Combine(GetOutputCatalogPath(projectsPath), changedFile);
+                        var destFilePath = Path.Combine(GetOutputCatalogPath(projectsPath, defaultOutputCatalogueName), changedFile);
 
                         if (!File.Exists(destFilePath))
                         {
@@ -188,14 +203,21 @@ namespace RepoChangesSearcher.Core
             });
         }
 
-        private string GetOutputCatalogPath(string projectsPath) => Path.Combine(projectsPath, "ChangedFilesFromRepository");
+        private string GetOutputCatalogPath(string projectsPath, string outputCatagueName) => Path.Combine(projectsPath, outputCatagueName);
+
+        private void PrepareDefaultOutputCatalogueName()
+        {
+            string dateTime = DateTime.Now.ToString("yyyyMMdd");
+            defaultOutputCatalogueName = string.Concat(DefaultOutputCatalogueBaseName, "_", dateTime);
+        }
 
         private void CreateDirectoryToMoveFiles(string projectsPath)
         {
             try
             {
-                bool exists = Directory.Exists(GetOutputCatalogPath(projectsPath));
-                if (!exists) Directory.CreateDirectory(GetOutputCatalogPath(projectsPath));
+                PrepareDefaultOutputCatalogueName();
+                bool exists = Directory.Exists(GetOutputCatalogPath(projectsPath, defaultOutputCatalogueName));
+                if (!exists) Directory.CreateDirectory(GetOutputCatalogPath(projectsPath, defaultOutputCatalogueName));
             }
             catch(Exception ex)
             {

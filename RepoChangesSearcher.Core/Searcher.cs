@@ -79,6 +79,13 @@ namespace RepoChangesSearcher.Core
                                            x.Author.Email.Equals(authorEmail))
                                         .ToList();
 
+                        if (!comits.Any()) 
+                        {
+                            Log.Warning($"Not found any commits for branch: {searchedBranch} for project repo: {path}, search configuration with the specified date rane: dateFrom: {dateFrom} and dateTo: {dateTo}");
+                            Log.Information($"End process for project repo: {path}");
+                            return;
+                        }
+
                         SetChangesFiles(comits);
                         RemoveDuplicates();
                         ProcessFiles(projectsPath, path, destinationOutputPath);
@@ -145,7 +152,7 @@ namespace RepoChangesSearcher.Core
                         return false;
                     }
 
-                    Log.Information($"Set destination catalogue as :{GetOutputCatalogPath(projectsPath, defaultOutputCatalogueName)}");
+                    Log.Information($"Set destination catalogue as: {GetOutputCatalogPath(projectsPath, defaultOutputCatalogueName)}");
                     
                     shouldUseDefaultOutputCatalogue = true;
                     
@@ -307,7 +314,10 @@ namespace RepoChangesSearcher.Core
 
         private void RemoveDuplicates()
         {
-            _changedFiles = _changedFiles.Distinct().ToList();
+            if (_changedFiles.Any())
+            {
+                _changedFiles = _changedFiles.Distinct().ToList();
+            }
         }
 
         private void SetChangesFiles(List<Commit> commits)

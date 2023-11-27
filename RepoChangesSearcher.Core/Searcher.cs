@@ -222,9 +222,19 @@ namespace RepoChangesSearcher.Core
                 sb.AppendLine("configuration field dateFrom can't be empty");
                 result = false;
             }
+            else if (!string.IsNullOrEmpty(configuration.dateFrom) && !ValidateDateFormat(configuration.dateFrom))
+            {
+                sb.AppendLine($"field dateFrom has incorrect formt: {configuration.dateFrom}, it should be date");
+                result = false;
+            }
             if (string.IsNullOrEmpty(configuration.dateTo))
             {
                 sb.AppendLine("configuration field dateTo can't be empty");
+                result = false;
+            }
+            else if (!string.IsNullOrEmpty(configuration.dateTo) && !ValidateDateFormat(configuration.dateTo))
+            {
+                sb.AppendLine($"field dateTo has incorrect formt: {configuration.dateTo}, it should be date");
                 result = false;
             }
             if (string.IsNullOrEmpty(configuration.authorEmail))
@@ -239,6 +249,11 @@ namespace RepoChangesSearcher.Core
             }
 
             return result;
+        }
+
+        private bool ValidateDateFormat(string date)
+        {
+            return DateTime.TryParse(date, out var dateOut);
         }
 
         private void ProcessFiles(string projectsPath, string repoPath, string destinationOutputPath)

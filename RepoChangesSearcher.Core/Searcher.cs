@@ -343,14 +343,22 @@ namespace RepoChangesSearcher.Core
                 {
                     commits.ForEach(commit =>
                     {
-                        var tree = commit.Tree;
-                        var treeParent = commit.Parents.FirstOrDefault().Tree;
+                        Tree tree = commit.Tree;
+                        Tree treeParent = null;
 
-                        var patch = _repo.Diff.Compare<Patch>(treeParent, tree).ToList();
-
-                        if (patch != null)
+                        var parentsComit = commit.Parents.FirstOrDefault();                        
+                       
+                        if (parentsComit != null)
                         {
-                            _changedFiles.AddRange(patch.Where(x => x.Status == ChangeKind.Modified).Select(x => Path.GetFileName(x.Path)));
+                            treeParent = commit.Parents.FirstOrDefault().Tree;
+
+                            var patch = PrepareCompareForPatchEntryChanges(treeParent, tree);
+                            AddToChangedFiles(patch);
+                        }
+                        else
+                        {
+                            var patch = PrepareCompareForPatchEntryChanges(treeParent, tree);
+                            AddToChangedFiles(patch);
                         }
                     });
                 }
@@ -358,6 +366,16 @@ namespace RepoChangesSearcher.Core
             catch(Exception ex)
             {
                 Log.Error($"Error during searching changes files in commits, error message: {ex.Message}");
+            }
+        }
+
+        private List<PatchEntryChanges> PrepareCompareForPatchEntryChanges(Tree treeParent, Tree tree) => _repo.Diff.Compare<Patch>(treeParent, tree).ToList();
+
+        private void AddToChangedFiles(List<PatchEntryChanges> patch)
+        {
+            if (patch != null)
+            {
+                _changedFiles.AddRange(patch.Where(x => x.Status == ChangeKind.Modified || x.Status == ChangeKind.Added).Select(x => Path.GetFileName(x.Path)));
             }
         }
 

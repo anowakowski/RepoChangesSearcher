@@ -32,6 +32,7 @@ var serviceProvider = new ServiceCollection()
 var searcher = serviceProvider.GetService<ISearcher>();
 
 searcher.Search();
+searcher.Dispose();
 
 Console.WriteLine("Click any key to close");
 Console.ReadKey();

@@ -3,5 +3,6 @@
     public interface ISearcher
     {
         void Search();
+        void Dispose();
     }
 }

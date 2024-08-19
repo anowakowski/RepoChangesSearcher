@@ -18,6 +18,9 @@ namespace RepoChangesSearcher.Core
         private List<ProcessedFilesModel> _allProcessedFiles = new List<ProcessedFilesModel>();
 
         private const string DefaultOutputCatalogueBaseName = "ChangedFilesFromRepository";
+        private const string DefaultPathForRasAPI2Proj = "C:\\Projects\\RASAPI2";
+        private const string CorrectSufixForRasAPI2ProjectPath = "\\rasapi";
+
         private string defaultOutputCatalogueName = string.Empty;
         private bool shouldUseDefaultOutputCatalogue = false;
 
@@ -41,12 +44,14 @@ namespace RepoChangesSearcher.Core
             var destinationOutputPath = configuration.destinationOutputPath;
 
             _direcotryPaths.AddRange(Directory.GetDirectories(projectsPath).Select(x => new DirectoryInfo(x).FullName).Where(x => x != GetOutputCatalogPath(projectsPath, defaultOutputCatalogueName)));
-            
+
             if (!_direcotryPaths.Any())
             {
                 Log.Error($"Not found any projects in configuret projectsPath: {projectsPath}");
                 return;
             }
+
+            SetCorrectValForRASAPI2Project();
 
             Log.Information($"Start search Files from repo for configuration: projectPath {projectsPath}, branchName: {branchToSearch}, author: {authorEmail}");
 
@@ -57,7 +62,7 @@ namespace RepoChangesSearcher.Core
             {
                 if (stopLoop) return;
                 InitRepo(path);
-                
+
                 if (_repo != null)
                 {
                     Log.Information($"Configure project repo: {path}");
@@ -79,7 +84,7 @@ namespace RepoChangesSearcher.Core
                                            x.Author.Email.Equals(authorEmail))
                                         .ToList();
 
-                        if (!comits.Any()) 
+                        if (!comits.Any())
                         {
                             Log.Warning($"Not found any commits for branch: {searchedBranch} for project repo: {path}, search configuration with the specified date rane: dateFrom: {dateFrom} and dateTo: {dateTo}");
                             Log.Information($"End process for project repo: {path}");
@@ -107,14 +112,14 @@ namespace RepoChangesSearcher.Core
                     Log.Warning($"project repository {path} is not GIT repository");
                 }
             });
-            
+
             Log.Information($"Finished search and copy process, copy: {_allProcessedFiles.Count(x => x.SuccessfullyProcessed)}, and {_allProcessedFiles.Count(x => !x.SuccessfullyProcessed)} not processed");
 
             if (_allProcessedFiles.Any(x => !x.SuccessfullyProcessed))
             {
                 var sb = new StringBuilder();
                 sb.AppendLine();
-                sb.AppendLine("Not processed files: ");                
+                sb.AppendLine("Not processed files: ");
                 _allProcessedFiles
                     .Where(x => !x.SuccessfullyProcessed)
                     .ToList()
@@ -122,19 +127,40 @@ namespace RepoChangesSearcher.Core
                     {
                         sb.AppendLine($"not processed file => name: {file.FileName}, repoPath: {file.RepoPath}, message: {file.ErrorMessage}");
                     });
-                
+
                 Log.Warning(sb.ToString());
             }
 
             var outputCatalogue = shouldUseDefaultOutputCatalogue ? GetOutputCatalogPath(projectsPath, defaultOutputCatalogueName) : destinationOutputPath;
             Log.Information($"Find the copied files in the location: {outputCatalogue}");
         }
+
+        private void SetCorrectValForRASAPI2Project()
+        {
+            if (_direcotryPaths.Any(x => x.Equals(DefaultPathForRasAPI2Proj)))
+            {
+                var val = _direcotryPaths.Single(x => x.Equals(DefaultPathForRasAPI2Proj));
+
+                var index = _direcotryPaths.IndexOf(val);
+
+                _direcotryPaths.RemoveAt(index);
+
+                val = string.Concat(val, CorrectSufixForRasAPI2ProjectPath);
+
+                _direcotryPaths.Insert(index, val);
+            }
+        }
+
         public void Dispose()
         {
             if (!_disposed)
             {
                 _disposed = true;
-                _repo.Dispose();
+
+                if (_repo != null)
+                {
+                    _repo.Dispose();
+                }
             }
         }
 
